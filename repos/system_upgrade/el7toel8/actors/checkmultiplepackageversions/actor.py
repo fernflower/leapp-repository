@@ -10,7 +10,7 @@ class CheckMultiplePackageVersions(Actor):
     Check for problematic 32bit packages installed together with 64bit ones.
 
     If a known problematic 32bit package is found, the upgrade will be inhibited with the detailed
-    report how to solve the problem if suck a remedy exists.
+    report how to solve the problem if such a remedy exists.
     """
 
     name = 'multiple_package_versions'
