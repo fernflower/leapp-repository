@@ -1,7 +1,7 @@
 from leapp.actors import Actor
 from leapp.libraries.common.rpms import has_package
-from leapp.models import InstalledRPM, Report
-from leapp.reporting import create_report, Title, Summary, Severity, Flags, Remediation, RelatedResource
+from leapp.models import InstalledRPM
+from leapp.reporting import create_report, Report, Title, Summary, Severity, Flags, Remediation, RelatedResource
 from leapp.tags import IPUWorkflowTag, ChecksPhaseTag
 
 
