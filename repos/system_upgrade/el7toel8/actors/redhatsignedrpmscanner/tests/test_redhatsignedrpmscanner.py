@@ -149,6 +149,10 @@ def test_create_lookup():
     with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
         lookup = rpms.create_lookup(MockModel, 'list_field', keys=('nosuchattr',))
         assert {} == lookup
+    # improper usage: lookup from iterable, multiple keys bad 1 bad
+    with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
+        lookup = rpms.create_lookup(MockModel, 'list_field', keys=('value', 'nosuchattr'))
+        assert {} == lookup
 
 
 def test_has_package(current_actor_context):
