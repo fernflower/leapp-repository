@@ -30,13 +30,13 @@ def create_lookup(model, field, keys, context=stdlib.api):
     """
     data = getattr(next((m for m in context.consume(model)), model()), field)
     try:
-        return {tuple(getattr(obj, key) for key in keys) for obj in data} if data else {}
+        return {tuple(getattr(obj, key) for key in keys) for obj in data} if data else set()
     except TypeError:
         # data is not iterable, not lookup can be built
         stdlib.api.current_logger().error(
                 "{model}.{field}.{keys} is not iterable, can't build lookup".format(
                     model=model, field=field, keys=keys))
-        return {}
+        return set()
 
 
 def has_package(model, package_name, arch=None, context=stdlib.api):

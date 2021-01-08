@@ -135,24 +135,24 @@ def test_create_lookup():
     model.list_field = []
     with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
         lookup = rpms.create_lookup(MockModel, 'list_field', keys=keys)
-        assert {} == lookup
+        assert set() == lookup
     # nullable list without default
     assert model.list_field_nullable is None
     with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
         lookup = rpms.create_lookup(MockModel, 'list_field_nullable', keys=keys)
-        assert {} == lookup
+        assert set() == lookup
     # improper usage: lookup from non iterable field
     with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
         lookup = rpms.create_lookup(MockModel, 'int_field', keys=keys)
-        assert {} == lookup
+        assert set() == lookup
     # improper usage: lookup from iterable but bad attribute
     with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
         lookup = rpms.create_lookup(MockModel, 'list_field', keys=('nosuchattr',))
-        assert {} == lookup
+        assert set() == lookup
     # improper usage: lookup from iterable, multiple keys bad 1 bad
     with mock.patch('leapp.libraries.stdlib.api.consume', return_value=(model,)):
         lookup = rpms.create_lookup(MockModel, 'list_field', keys=('value', 'nosuchattr'))
-        assert {} == lookup
+        assert set() == lookup
 
 
 def test_has_package(current_actor_context):
