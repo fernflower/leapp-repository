@@ -75,65 +75,75 @@ def _get_partitions_info(partitions_path):
                     name=name)
 
 
-@aslist
 def _get_fstab_info(fstab_path):
-    """ Collect storage info from /etc/fstab file """
-    if _is_file_readable(fstab_path):
-        with open(fstab_path, 'r') as fstab:
-            for line, entry in enumerate(fstab, 1):
-                if entry.startswith('#'):
-                    continue
+    """ Collect storage info from /etc/fstab file
+        Returns a list of successfully processed fstab entries, errors_dict
+    """
+    if not _is_file_readable(fstab_path):
+        return [], {}
 
-                entry = entry.strip()
-                if not entry:
-                    continue
+    fstab_entries = []
+    errors = {}
+    def _add_error(title, summary, remediation, severity=reporting.Severity.HIGH,
+                   flags=(reporting.Flags.INHIBITOR, )):
+        data = {'summary': summary, 'severity': severity, 'flags': list(flags), 'remediation': remediation}
+        if title not in errors:
+            errors[title] = [data]
+        else:
+            errors[title].append(data)
 
-                entries = entry.split()
+    with open(fstab_path, 'r') as fstab:
+        for line, entry in enumerate(fstab, 1):
+            if entry.startswith('#'):
+                continue
 
-                if len(entries) == 4:
-                    entries.append('0')
+            entry = entry.strip()
+            if not entry:
+                continue
 
-                if len(entries) == 5:
-                    entries.append('0')
+            entries = entry.split()
 
-                if len(entries) != 6:
-                    if any(value.startswith('#') for value in entries):
-                        remediation = (
-                            'Comments in the /etc/fstab file must be at the beginning of the line, your file has a'
-                            ' comment at the end of the line at line {}, please edit and fix this, for further'
-                            ' information read fstab man page (man 5 fstab).'.format(line)
-                        )
-                    else:
-                        remediation = (
-                            'The /etc/fstab file must have at least 4 values and at most 6 per line, your file on the'
-                            ' line: {} have {} values, please edit and fix this, for further information read'
-                            ' fstab man page (man 5 fstab). '.format(line, len(entries))
-                        )
-                    summary = (
-                        'The fstab configuration file seems to be invalid. You need to fix it to be able to proceed'
-                        ' with the upgrade process.'
+            if len(entries) == 4:
+                entries.append('0')
+
+            if len(entries) == 5:
+                entries.append('0')
+
+            if len(entries) != 6:
+                if any(value.startswith('#') for value in entries):
+                    remediation = (
+                        'Comments in the /etc/fstab file must be at the beginning of the line, your file has a'
+                        ' comment at the end of the line at line {}, please edit and fix this, for further'
+                        ' information read fstab man page (man 5 fstab).'.format(line)
                     )
-                    reporting.create_report([
-                        reporting.Title('Problems with parsing data in /etc/fstab'),
-                        reporting.Summary(summary),
-                        reporting.Severity(reporting.Severity.HIGH),
-                        reporting.Tags([reporting.Tags.FILESYSTEM]),
-                        reporting.Flags([reporting.Flags.INHIBITOR]),
-                        reporting.Remediation(hint=remediation),
-                        reporting.RelatedResource('file', '/etc/fstab')
-                    ])
+                else:
+                    remediation = (
+                        'The /etc/fstab file must have at least 4 values and at most 6 per line, your file on the'
+                        ' line: {} has {} values, please edit and fix this, for further information read'
+                        ' fstab man page (man 5 fstab). '.format(line, len(entries))
+                    )
+                summary = (
+                    'The fstab configuration file seems to be invalid. You need to fix it to be able to proceed'
+                    ' with the upgrade process.'
+                )
+                _add_error('Problems with parsing data in /etc/fstab', summary, remediation)
 
-                    api.current_logger().error(summary)
-                    break
+                api.current_logger().error(summary)
+                continue
 
-                fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno = entries
-                yield FstabEntry(
-                    fs_spec=fs_spec,
-                    fs_file=fs_file,
-                    fs_vfstype=fs_vfstype,
-                    fs_mntops=fs_mntops,
-                    fs_freq=fs_freq,
-                    fs_passno=fs_passno)
+            fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno = entries
+            # NOTE(ivasilev) As specified in OAMG-4107, before networking is working in the initramfs stage
+            # the upgrade should be inhibited if any CIFS entries are found.
+            if fs_vfstype == 'cifs':
+                summary = 'CIFS entries are not supported at the moment.'
+                _add_error('CIFS entry encountered in /etc/fstab', summary,
+                           'Please comment out the CIFS entry at line {}.'.format(line))
+                api.current_logger().error(summary)
+                continue
+
+            fstab_entries.append(FstabEntry(fs_spec=fs_spec, fs_file=fs_file, fs_vfstype=fs_vfstype,
+                                            fs_mntops=fs_mntops, fs_freq=fs_freq, fs_passno=fs_passno))
+    return fstab_entries, errors
 
 
 @aslist
@@ -236,9 +246,23 @@ def _get_systemd_mount_info():
 
 def get_storage_info():
     """ Collect multiple info about storage and return it """
+    fstab_entries, errors = _get_fstab_info('/etc/fstab')
+    for title, errs in errors.items():
+        # now multiple errors of the same type are grouped together, they are different only in remediation which
+        # points at the correct line
+        remediation = '\n'.join([e['remediation'] for e in errs])
+        reporting.create_report([
+            reporting.Title(title),
+            reporting.Summary(errs[0]['summary']),
+            reporting.Severity(errs[0]['severity']),
+            reporting.Tags([reporting.Tags.FILESYSTEM]),
+            reporting.Flags(errs[0]['flags']),
+            reporting.Remediation(hint=remediation),
+            reporting.RelatedResource('file', '/etc/fstab')
+        ])
     return StorageInfo(
         partitions=_get_partitions_info('/proc/partitions'),
-        fstab=_get_fstab_info('/etc/fstab'),
+        fstab=fstab_entries,
         mount=_get_mount_info('/proc/mounts'),
         lsblk=_get_lsblk_info(),
         pvs=_get_pvs_info(),

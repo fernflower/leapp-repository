@@ -63,20 +63,23 @@ def test_get_fstab_info(monkeypatch):
             fs_mntops='defaults',
             fs_freq='0',
             fs_passno='0')]
-    assert expected == storagescanner._get_fstab_info(os.path.join(CUR_DIR, 'files/fstab'))
+    actual = storagescanner._get_fstab_info(os.path.join(CUR_DIR, 'files/fstab'))[0]
+    assert expected == actual
     monkeypatch.setattr(storagescanner, '_is_file_readable', lambda dummy: False)
-    assert [] == storagescanner._get_fstab_info('unreadable_file')
+    assert [] == storagescanner._get_fstab_info('unreadable_file')[0]
 
 
 def test_invalid_fstab_info(monkeypatch):
     monkeypatch.setattr(reporting, "create_report", create_report_mocked())
     monkeypatch.setattr(api, 'current_logger', logger_mocked())
 
-    storagescanner._get_fstab_info(os.path.join(CUR_DIR, 'files/invalid_fstab'))
-    assert reporting.create_report.called == 1
-    assert reporting.create_report.report_fields['severity'] == 'high'
-    assert 'Problems with parsing data in /etc/fstab' in reporting.create_report.report_fields['title']
-    assert 'inhibitor' in reporting.create_report.report_fields['flags']
+    errors = storagescanner._get_fstab_info(os.path.join(CUR_DIR, 'files/invalid_fstab'))[1]
+    assert errors != {}
+    err_title = 'Problems with parsing data in /etc/fstab'
+    assert len(errors[err_title]) == 2
+    for err in errors[err_title]:
+        assert err['severity'] == 'high'
+        assert 'inhibitor' in err['flags']
     assert any("The fstab configuration file seems to be invalid" in msg for msg in api.current_logger.errmsg)
 
 
@@ -417,3 +420,17 @@ def test_get_systemd_mount_info(monkeypatch):
             label='n/a',
             uuid='c3890bf3-9273-4877-ad1f-68144e1eb858')]
     assert expected == storagescanner._get_systemd_mount_info()
+
+
+def test_inhibit_upon_cifs_entry(monkeypatch):
+    monkeypatch.setattr(reporting, "create_report", create_report_mocked())
+    monkeypatch.setattr(api, 'current_logger', logger_mocked())
+
+    errors = storagescanner._get_fstab_info(os.path.join(CUR_DIR, 'files/cifs_fstab'))[1]
+    assert errors != {}
+    err_title = 'CIFS entry encountered in /etc/fstab'
+    assert len(errors[err_title]) == 2
+    for err in errors[err_title]:
+        assert err['severity'] == 'high'
+        assert 'inhibitor' in err['flags']
+    assert any("CIFS entries are not supported at the moment" in msg for msg in api.current_logger.errmsg)
