@@ -22,3 +22,13 @@ def test_actor_with_fstab_entry(current_actor_context):
     assert 'inhibitor' in report_fields['flags']
     assert report_fields['severity'] == 'high'
     assert report_fields['title'] == "Use of CIFS detected. Upgrade can't proceed"
+
+
+def test_actor_no_cifs(current_actor_context):
+    with_fstab_entry = [FstabEntry(fs_spec="/dev/mapper/fedora-home", fs_file="/home",
+                                   fs_vfstype="ext4",
+                                   fs_mntops="defaults,x-systemd.device-timeout=0",
+                                   fs_freq="1", fs_passno="2")]
+    current_actor_context.feed(StorageInfo(fstab=with_fstab_entry))
+    current_actor_context.run()
+    assert not current_actor_context.consume(Report)
