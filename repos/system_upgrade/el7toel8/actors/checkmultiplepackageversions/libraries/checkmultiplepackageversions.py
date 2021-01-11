@@ -27,9 +27,11 @@ def check():
         remediation = ["yum", "remove", "-y"] + actual_problems
         # create a single report entry for all problematic packages
         create_report([
-            Title('Some packages have both 32bit and 64bit version installed which are known to be incompatible'),
-            Summary('The following packages have both 32bit and 64bit version installed which are known to be '
-                    'incompatible in RHEL8:\n{}'.format('\n'.join(['-{}'.format(a) for a in actual_problems]))),
+            Title('Some packages have both 32bit and 64bit version installed which are known '
+                  'to cause rpm transaction test to fail'),
+            Summary('The following packages have both 32bit and 64bit version installed which are known '
+                    'to cause rpm transaction test to fail:\n{}'.format(
+                        '\n'.join(['- {}'.format(a) for a in actual_problems]))),
             Severity(Severity.HIGH),
             Flags([Flags.INHIBITOR]),
             Remediation(commands=[remediation])] + related_resources)

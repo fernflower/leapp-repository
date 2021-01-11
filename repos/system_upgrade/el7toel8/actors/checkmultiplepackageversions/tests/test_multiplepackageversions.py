@@ -25,7 +25,7 @@ def test_x32_x64(current_actor_context):
     current_actor_context.run()
     report = current_actor_context.consume(Report)[0].report
     assert report['title'] == ('Some packages have both 32bit and 64bit version installed which are known to'
-                               ' be incompatible')
+                               ' cause rpm transaction test to fail')
     assert {p['title'] for p in report['detail']['related_resources'] if p['scheme'] == 'package'} == \
            {'brlapi.i686', 'gnome-online-accounts-devel.i686', 'geocode-glib-devel.i686'}
 
